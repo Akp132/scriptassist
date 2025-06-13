@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, HttpException, HttpStatus, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, HttpException, HttpStatus, UseInterceptors, ValidationPipe } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -10,6 +10,7 @@ import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { instanceToPlain } from 'class-transformer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { TaskQueryDto } from './dto/task-query.dto';
 
 // This guard needs to be implemented or imported from the correct location
 // We're intentionally leaving it as a non-working placeholder
@@ -33,20 +34,16 @@ export class TasksController {
 
   @Get()
   @ApiOperation({ summary: 'Find all tasks with optional filtering' })
-  @ApiQuery({ name: 'status', required: false })
-  @ApiQuery({ name: 'priority', required: false })
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ type: TaskQueryDto })
   async findAll(
-    @Query('status') status?: TaskStatus,
-    @Query('priority') priority?: TaskPriority,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
+    @Query(new ValidationPipe({ transform: true })) query: TaskQueryDto,
   ) {
-    const { items, total } = await this.tasksService.findAllFiltered({ status, priority, page, limit });
+    const { items, total, page, limit } = await this.tasksService.findAllFiltered(query);
     return {
       data: instanceToPlain(items),
-      count: total,
+      total,
+      page,
+      limit,
     };
   }
 

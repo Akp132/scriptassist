@@ -8,6 +8,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
+import { TaskQueryDto } from './dto/task-query.dto';
 
 @Injectable()
 export class TasksService {
@@ -91,34 +92,31 @@ export class TasksService {
 
   /**
    * Find all tasks with optional filters and pagination, eliminating N+1 queries.
-   * @param status Optional TaskStatus filter
-   * @param priority Optional TaskPriority filter
-   * @param page Page number (default 1)
-   * @param limit Page size (default 10)
+   * @param queryDto TaskQueryDto with filters and pagination
    * @returns { items: Task[], total: number }
    */
-  async findAllFiltered(options?: {
-    status?: TaskStatus;
-    priority?: TaskPriority;
-    page?: number;
-    limit?: number;
-  }): Promise<{ items: Task[]; total: number }> {
-    const page = options?.page && options.page > 0 ? options.page : 1;
-    const limit = options?.limit && options.limit > 0 ? options.limit : 10;
+  async findAllFiltered(queryDto: TaskQueryDto): Promise<{ items: Task[]; total: number; page: number; limit: number }> {
+    const { status, priority, search, page = 1, limit = 10 } = queryDto;
     const query = this.tasksRepository.createQueryBuilder('task')
       .leftJoinAndSelect('task.user', 'user')
       .orderBy('task.createdAt', 'DESC');
 
-    if (options?.status) {
-      query.andWhere('task.status = :status', { status: options.status });
+    if (status) {
+      query.andWhere('task.status = :status', { status });
     }
-    if (options?.priority) {
-      query.andWhere('task.priority = :priority', { priority: options.priority });
+    if (priority) {
+      query.andWhere('task.priority = :priority', { priority });
+    }
+    if (search) {
+      query.andWhere(
+        '(task.title ILIKE :search OR task.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
     }
 
     query.skip((page - 1) * limit).take(limit);
 
     const [items, total] = await query.getManyAndCount();
-    return { items, total };
+    return { items, total, page, limit };
   }
 }
