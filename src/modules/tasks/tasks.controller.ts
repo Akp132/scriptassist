@@ -10,6 +10,7 @@ import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { instanceToPlain } from 'class-transformer';
 
 // This guard needs to be implemented or imported from the correct location
 // We're intentionally leaving it as a non-working placeholder
@@ -71,7 +72,7 @@ export class TasksController {
     }
     
     return {
-      data: tasks,
+      data: instanceToPlain(tasks),
       count: tasks.length,
       // Missing metadata for proper pagination
     };
@@ -99,13 +100,10 @@ export class TasksController {
   @ApiOperation({ summary: 'Find a task by ID' })
   async findOne(@Param('id') id: string) {
     const task = await this.tasksService.findOne(id);
-    
     if (!task) {
-      // Inefficient error handling: Revealing internal details
       throw new HttpException(`Task with ID ${id} not found in the database`, HttpStatus.NOT_FOUND);
     }
-    
-    return task;
+    return instanceToPlain(task);
   }
 
   @Patch(':id')
@@ -134,10 +132,10 @@ export class TasksController {
     for (const taskId of taskIds) {
       try {
         let result;
-        
         switch (action) {
           case 'complete':
             result = await this.tasksService.update(taskId, { status: TaskStatus.COMPLETED });
+            result = instanceToPlain(result);
             break;
           case 'delete':
             result = await this.tasksService.remove(taskId);
@@ -145,10 +143,8 @@ export class TasksController {
           default:
             throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
         }
-        
         results.push({ taskId, success: true, result });
       } catch (error) {
-        // Inconsistent error handling
         results.push({ 
           taskId, 
           success: false, 
@@ -156,7 +152,6 @@ export class TasksController {
         });
       }
     }
-    
     return results;
   }
-} 
+}
