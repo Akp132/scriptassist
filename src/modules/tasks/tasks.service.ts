@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Task } from './entities/task.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -17,6 +17,7 @@ export class TasksService {
     private tasksRepository: Repository<Task>,
     @InjectQueue('task-processing')
     private taskQueue: Queue,
+    private dataSource: DataSource,
   ) {}
 
   async create(createTaskDto: CreateTaskDto): Promise<Task> {
@@ -118,5 +119,68 @@ export class TasksService {
 
     const [items, total] = await query.getManyAndCount();
     return { items, total, page, limit };
+  }
+
+  async bulkComplete(taskIds: string[], currentUser: any): Promise<{ updated: number; taskIds: string[] }> {
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new NotFoundException('No task IDs provided');
+    }
+    return await this.dataSource.transaction(async manager => {
+      // Ownership check
+      let allowedTaskIds = taskIds;
+      if (currentUser.role !== 'ADMIN') {
+        const userTasks = await manager
+          .createQueryBuilder(Task, 'task')
+          .select('task.id')
+          .where('task.id IN (:...taskIds)', { taskIds })
+          .andWhere('task.userId = :userId', { userId: currentUser.id })
+          .getMany();
+        allowedTaskIds = userTasks.map(t => t.id);
+        if (allowedTaskIds.length === 0) {
+          throw new ForbiddenException('No authorized tasks to complete');
+        }
+      }
+      // Bulk update
+      const result = await manager
+        .createQueryBuilder()
+        .update(Task)
+        .set({ status: TaskStatus.COMPLETED })
+        .where('id IN (:...ids)', { ids: allowedTaskIds })
+        .execute();
+      // Queue job
+      await this.taskQueue.add('task-status-bulk', {
+        taskIds: allowedTaskIds,
+        status: TaskStatus.COMPLETED,
+      });
+      return { updated: result.affected || 0, taskIds: allowedTaskIds };
+    });
+  }
+
+  async bulkDelete(taskIds: string[], currentUser: any): Promise<{ deleted: number; taskIds: string[] }> {
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new NotFoundException('No task IDs provided');
+    }
+    return await this.dataSource.transaction(async manager => {
+      let allowedTaskIds = taskIds;
+      if (currentUser.role !== 'ADMIN') {
+        const userTasks = await manager
+          .createQueryBuilder(Task, 'task')
+          .select('task.id')
+          .where('task.id IN (:...taskIds)', { taskIds })
+          .andWhere('task.userId = :userId', { userId: currentUser.id })
+          .getMany();
+        allowedTaskIds = userTasks.map(t => t.id);
+        if (allowedTaskIds.length === 0) {
+          throw new ForbiddenException('No authorized tasks to delete');
+        }
+      }
+      const result = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(Task)
+        .where('id IN (:...ids)', { ids: allowedTaskIds })
+        .execute();
+      return { deleted: result.affected || 0, taskIds: allowedTaskIds };
+    });
   }
 }

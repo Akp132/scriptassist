@@ -1,8 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, HttpException, HttpStatus, UseInterceptors, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Patch, Post, Query, UseGuards, ValidationPipe } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags, ApiBody } from '@nestjs/swagger';
 import { Task } from './entities/task.entity';
 import { TaskStatus } from './enums/task-status.enum';
 import { TaskPriority } from './enums/task-priority.enum';
@@ -85,35 +85,21 @@ export class TasksController {
 
   @Post('batch')
   @ApiOperation({ summary: 'Batch process multiple tasks' })
+  @ApiBody({ schema: { properties: { tasks: { type: 'array', items: { type: 'string' } }, action: { type: 'string', enum: ['complete', 'delete'] } } } })
   async batchProcess(
-    @Body() operations: { tasks: string[], action: string },
+    @Body() operations: { tasks: string[], action: 'complete' | 'delete' },
     @CurrentUser() currentUser: any,
   ) {
     const { tasks: taskIds, action } = operations;
-    const results = [];
-    for (const taskId of taskIds) {
-      try {
-        let result;
-        switch (action) {
-          case 'complete':
-            result = await this.tasksService.update(taskId, { status: TaskStatus.COMPLETED }, currentUser);
-            result = instanceToPlain(result);
-            break;
-          case 'delete':
-            result = await this.tasksService.remove(taskId, currentUser);
-            break;
-          default:
-            throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
-        }
-        results.push({ taskId, success: true, result });
-      } catch (error) {
-        results.push({ 
-          taskId, 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error'
-        });
-      }
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new HttpException('No task IDs provided', HttpStatus.BAD_REQUEST);
     }
-    return results;
+    if (action === 'complete') {
+      return await this.tasksService.bulkComplete(taskIds, currentUser);
+    } else if (action === 'delete') {
+      return await this.tasksService.bulkDelete(taskIds, currentUser);
+    } else {
+      throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
+    }
   }
 }
