@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
@@ -19,12 +19,9 @@ export class TasksService {
   ) {}
 
   async create(createTaskDto: CreateTaskDto): Promise<Task> {
-    // Inefficient implementation: creates the task but doesn't use a single transaction
-    // for creating and adding to queue, potential for inconsistent state
     const task = this.tasksRepository.create(createTaskDto);
     const savedTask = await this.tasksRepository.save(task);
 
-    // Add to queue without waiting for confirmation or handling errors
     this.taskQueue.add('task-status-update', {
       taskId: savedTask.id,
       status: savedTask.status,
@@ -34,15 +31,12 @@ export class TasksService {
   }
 
   async findAll(): Promise<Task[]> {
-    // Inefficient implementation: retrieves all tasks without pagination
-    // and loads all relations, causing potential performance issues
     return this.tasksRepository.find({
       relations: ['user'],
     });
   }
 
   async findOne(id: string): Promise<Task> {
-    // Inefficient implementation: two separate database calls
     const count = await this.tasksRepository.count({ where: { id } });
 
     if (count === 0) {
@@ -55,47 +49,41 @@ export class TasksService {
     })) as Task;
   }
 
-  async update(id: string, updateTaskDto: UpdateTaskDto): Promise<Task> {
-    // Inefficient implementation: multiple database calls
-    // and no transaction handling
+  async update(id: string, updateTaskDto: UpdateTaskDto, currentUser: any): Promise<Task> {
     const task = await this.findOne(id);
-
+    if (task.user.id !== currentUser.id && currentUser.role !== 'ADMIN') {
+      throw new ForbiddenException('Not authorized to modify this task.');
+    }
     const originalStatus = task.status;
-
-    // Directly update each field individually
     if (updateTaskDto.title) task.title = updateTaskDto.title;
     if (updateTaskDto.description) task.description = updateTaskDto.description;
     if (updateTaskDto.status) task.status = updateTaskDto.status;
     if (updateTaskDto.priority) task.priority = updateTaskDto.priority;
     if (updateTaskDto.dueDate) task.dueDate = new Date(updateTaskDto.dueDate);
-
     const updatedTask = await this.tasksRepository.save(task);
-
-    // Add to queue if status changed, but without proper error handling
     if (originalStatus !== updatedTask.status) {
       this.taskQueue.add('task-status-update', {
         taskId: updatedTask.id,
         status: updatedTask.status,
       });
     }
-
     return updatedTask;
   }
 
-  async remove(id: string): Promise<void> {
-    // Inefficient implementation: two separate database calls
+  async remove(id: string, currentUser: any): Promise<void> {
     const task = await this.findOne(id);
+    if (task.user.id !== currentUser.id && currentUser.role !== 'ADMIN') {
+      throw new ForbiddenException('Not authorized to delete this task.');
+    }
     await this.tasksRepository.remove(task);
   }
 
   async findByStatus(status: TaskStatus): Promise<Task[]> {
-    // Inefficient implementation: doesn't use proper repository patterns
     const query = 'SELECT * FROM tasks WHERE status = $1';
     return this.tasksRepository.query(query, [status]);
   }
 
   async updateStatus(id: string, status: string): Promise<Task> {
-    // This method will be called by the task processor
     const task = await this.findOne(id);
     task.status = status as any;
     return this.tasksRepository.save(task);

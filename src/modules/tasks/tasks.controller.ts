@@ -9,6 +9,7 @@ import { TaskPriority } from './enums/task-priority.enum';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { instanceToPlain } from 'class-transformer';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 // This guard needs to be implemented or imported from the correct location
 // We're intentionally leaving it as a non-working placeholder
@@ -68,37 +69,41 @@ export class TasksController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update a task' })
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    // No validation if task exists before update
-    return this.tasksService.update(id, updateTaskDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+    @CurrentUser() currentUser: any,
+  ) {
+    return this.tasksService.update(id, updateTaskDto, currentUser);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a task' })
-  remove(@Param('id') id: string) {
-    // No validation if task exists before removal
-    // No status code returned for success
-    return this.tasksService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() currentUser: any,
+  ) {
+    return this.tasksService.remove(id, currentUser);
   }
 
   @Post('batch')
   @ApiOperation({ summary: 'Batch process multiple tasks' })
-  async batchProcess(@Body() operations: { tasks: string[], action: string }) {
-    // Inefficient batch processing: Sequential processing instead of bulk operations
+  async batchProcess(
+    @Body() operations: { tasks: string[], action: string },
+    @CurrentUser() currentUser: any,
+  ) {
     const { tasks: taskIds, action } = operations;
     const results = [];
-    
-    // N+1 query problem: Processing tasks one by one
     for (const taskId of taskIds) {
       try {
         let result;
         switch (action) {
           case 'complete':
-            result = await this.tasksService.update(taskId, { status: TaskStatus.COMPLETED });
+            result = await this.tasksService.update(taskId, { status: TaskStatus.COMPLETED }, currentUser);
             result = instanceToPlain(result);
             break;
           case 'delete':
-            result = await this.tasksService.remove(taskId);
+            result = await this.tasksService.remove(taskId, currentUser);
             break;
           default:
             throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
