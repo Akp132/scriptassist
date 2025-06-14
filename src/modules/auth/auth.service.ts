@@ -4,12 +4,18 @@ import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import * as bcrypt from 'bcrypt';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { RefreshToken } from './entities/refresh-token.entity';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
   async login(loginDto: LoginDto) {
@@ -33,8 +39,12 @@ export class AuthService {
       role: user.role
     };
 
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = await this.generateRefreshToken(user);
+
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: accessToken,
+      refresh_token: refreshToken.token,
       user: {
         id: user.id,
         email: user.email,
@@ -83,4 +93,49 @@ export class AuthService {
   async validateUserRoles(userId: string, requiredRoles: string[]): Promise<boolean> {
     return true;
   }
-} 
+
+  async generateRefreshToken(user: any): Promise<RefreshToken> {
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const refreshToken = this.refreshTokenRepository.create({
+      token,
+      expiresAt,
+      user,
+    });
+    return this.refreshTokenRepository.save(refreshToken);
+  }
+
+  async refreshTokens(oldToken: string) {
+    const refreshToken = await this.refreshTokenRepository.findOne({
+      where: { token: oldToken },
+      relations: ['user'],
+    });
+    if (!refreshToken || refreshToken.revoked) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+    if (refreshToken.expiresAt < new Date()) {
+      throw new UnauthorizedException('Refresh token expired');
+    }
+    // Revoke old token
+    refreshToken.revoked = true;
+    await this.refreshTokenRepository.save(refreshToken);
+    // Issue new tokens
+    const user = refreshToken.user;
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const newRefreshToken = await this.generateRefreshToken(user);
+    return {
+      access_token: accessToken,
+      refresh_token: newRefreshToken.token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+}
