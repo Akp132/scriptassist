@@ -53,31 +53,44 @@ export class TasksService {
 
   async update(id: string, updateTaskDto: UpdateTaskDto, currentUser: any): Promise<Task> {
     const task = await this.findOne(id);
-    if (task.user.id !== currentUser.id && currentUser.role !== 'ADMIN') {
-      throw new ForbiddenException('Not authorized to modify this task.');
+    // Debug: Log currentUser and task
+    console.log('DEBUG update: currentUser', currentUser);
+    console.log('DEBUG update: task', task);
+    if (!currentUser) {
+      throw new ForbiddenException('Unauthenticated');
     }
-    const originalStatus = task.status;
-    if (updateTaskDto.title) task.title = updateTaskDto.title;
-    if (updateTaskDto.description) task.description = updateTaskDto.description;
-    if (updateTaskDto.status) task.status = updateTaskDto.status;
-    if (updateTaskDto.priority) task.priority = updateTaskDto.priority;
-    if (updateTaskDto.dueDate) task.dueDate = new Date(updateTaskDto.dueDate);
+    // Only owner or admin can update
+    if (task.userId !== currentUser.id && currentUser.role !== 'admin') {
+      throw new ForbiddenException(
+        `Not authorized to modify this task. task.userId=${task.userId}, currentUser.id=${currentUser.id}, currentUser.role=${currentUser.role}`
+      );
+    }
+    // Only allow status update
+    if (updateTaskDto.status) {
+      task.status = updateTaskDto.status;
+    } else {
+      throw new ForbiddenException('Only status update is allowed');
+    }
     const updatedTask = await this.tasksRepository.save(task);
-    if (originalStatus !== updatedTask.status) {
-      this.taskQueue.add('task-status-update', {
-        taskId: updatedTask.id,
-        status: updatedTask.status,
-      });
-    }
+    this.taskQueue.add('task-status-update', {
+      taskId: updatedTask.id,
+      status: updatedTask.status,
+    });
     return updatedTask;
   }
 
   async remove(id: string, currentUser: any): Promise<void> {
     const task = await this.findOne(id);
-    if (task.user.id !== currentUser.id && currentUser.role !== 'ADMIN') {
-      throw new ForbiddenException('Not authorized to delete this task.');
+    // Debug: Log currentUser and task
+    console.log('DEBUG remove: currentUser', currentUser);
+    console.log('DEBUG remove: task', task);
+    if (!currentUser) {
+      throw new ForbiddenException('Unauthenticated');
     }
-    await this.tasksRepository.remove(task);
+    if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Not authorized to delete this task. Only admin allowed.');
+    }
+    await this.tasksRepository.delete(id);
   }
 
   async findByStatus(status: TaskStatus): Promise<Task[]> {

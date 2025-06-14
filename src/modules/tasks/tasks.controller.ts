@@ -11,14 +11,12 @@ import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { instanceToPlain } from 'class-transformer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TaskQueryDto } from './dto/task-query.dto';
-
-// This guard needs to be implemented or imported from the correct location
-// We're intentionally leaving it as a non-working placeholder
-class JwtAuthGuard {}
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 @ApiTags('tasks')
 @Controller('tasks')
-@UseGuards(JwtAuthGuard, RateLimitGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, RateLimitGuard)
 @RateLimit({ limit: 100, windowMs: 60000 })
 @ApiBearerAuth()
 export class TasksController {
@@ -65,6 +63,7 @@ export class TasksController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update a task' })
   update(
     @Param('id') id: string,
@@ -75,6 +74,7 @@ export class TasksController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete a task' })
   remove(
     @Param('id') id: string,
