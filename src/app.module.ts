@@ -14,6 +14,8 @@ import * as redisStore from 'cache-manager-ioredis';
 import { APP_GUARD } from '@nestjs/core';
 import { CacheService } from './common/services/cache.service';
 import redisConfig from './config/redis.config';
+import { LoggingModule } from './logging/logging.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -80,6 +82,8 @@ import redisConfig from './config/redis.config';
     AuthModule,
     TaskProcessorModule,
     ScheduledTasksModule,
+    LoggingModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
