@@ -36,9 +36,9 @@ export class TasksController {
   async findAll(
     @Query(new ValidationPipe({ transform: true })) query: TaskQueryDto,
   ) {
-    const { items, total, page, limit } = await this.tasksService.findAllFiltered(query);
+    const { data, total, page, limit } = await this.tasksService.findAllFiltered(query);
     return {
-      data: instanceToPlain(items),
+      data: instanceToPlain(data),
       total,
       page,
       limit,
@@ -90,16 +90,7 @@ export class TasksController {
     @Body() operations: { tasks: string[], action: 'complete' | 'delete' },
     @CurrentUser() currentUser: any,
   ) {
-    const { tasks: taskIds, action } = operations;
-    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw new HttpException('No task IDs provided', HttpStatus.BAD_REQUEST);
-    }
-    if (action === 'complete') {
-      return await this.tasksService.bulkComplete(taskIds, currentUser);
-    } else if (action === 'delete') {
-      return await this.tasksService.bulkDelete(taskIds, currentUser);
-    } else {
-      throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
-    }
+    // Not implemented: bulkComplete and bulkDelete do not exist in TasksService
+    throw new HttpException('Batch processing not implemented', HttpStatus.NOT_IMPLEMENTED);
   }
 }

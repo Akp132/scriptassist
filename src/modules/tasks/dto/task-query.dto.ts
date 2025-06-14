@@ -33,4 +33,9 @@ export class TaskQueryDto {
   @Min(1)
   @IsOptional()
   limit: number = 10;
+
+  @ApiPropertyOptional({ description: 'Filter by userId (admin only)' })
+  @IsString()
+  @IsOptional()
+  userId?: string;
 }

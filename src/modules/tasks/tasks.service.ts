@@ -109,91 +109,38 @@ export class TasksService {
    * @param queryDto TaskQueryDto with filters and pagination
    * @returns { items: Task[], total: number }
    */
-  async findAllFiltered(queryDto: TaskQueryDto): Promise<{ items: Task[]; total: number; page: number; limit: number }> {
-    const { status, priority, search, page = 1, limit = 10 } = queryDto;
-    const query = this.tasksRepository.createQueryBuilder('task')
+  async findAllFiltered(queryDto: TaskQueryDto, currentUser?: any): Promise<{ data: Task[]; total: number; page: number; limit: number }> {
+    const { status, priority, search, page = 1, limit = 10, userId } = queryDto;
+    const qb = this.tasksRepository.createQueryBuilder('task')
       .leftJoinAndSelect('task.user', 'user')
-      .orderBy('task.createdAt', 'DESC');
+      .orderBy('task.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .addSelect('COUNT(*) OVER() as "totalCount"');
 
+    // Only non-admins can see their own tasks
+    if (currentUser && currentUser.role !== 'admin') {
+      qb.andWhere('task.userId = :userId', { userId: currentUser.id });
+    } else if (userId) {
+      qb.andWhere('task.userId = :userId', { userId });
+    }
     if (status) {
-      query.andWhere('task.status = :status', { status });
+      qb.andWhere('task.status = :status', { status });
     }
     if (priority) {
-      query.andWhere('task.priority = :priority', { priority });
+      qb.andWhere('task.priority = :priority', { priority });
     }
     if (search) {
-      query.andWhere(
-        '(task.title ILIKE :search OR task.description ILIKE :search)',
-        { search: `%${search}%` },
-      );
+      qb.andWhere('(task.title ILIKE :search OR task.description ILIKE :search)', { search: `%${search}%` });
     }
 
-    query.skip((page - 1) * limit).take(limit);
-
-    const [items, total] = await query.getManyAndCount();
-    return { items, total, page, limit };
-  }
-
-  async bulkComplete(taskIds: string[], currentUser: any): Promise<{ updated: number; taskIds: string[] }> {
-    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw new NotFoundException('No task IDs provided');
-    }
-    return await this.dataSource.transaction(async manager => {
-      // Ownership check
-      let allowedTaskIds = taskIds;
-      if (currentUser.role !== 'ADMIN') {
-        const userTasks = await manager
-          .createQueryBuilder(Task, 'task')
-          .select('task.id')
-          .where('task.id IN (:...taskIds)', { taskIds })
-          .andWhere('task.userId = :userId', { userId: currentUser.id })
-          .getMany();
-        allowedTaskIds = userTasks.map(t => t.id);
-        if (allowedTaskIds.length === 0) {
-          throw new ForbiddenException('No authorized tasks to complete');
-        }
-      }
-      // Bulk update
-      const result = await manager
-        .createQueryBuilder()
-        .update(Task)
-        .set({ status: TaskStatus.COMPLETED })
-        .where('id IN (:...ids)', { ids: allowedTaskIds })
-        .execute();
-      // Queue job
-      await this.taskQueue.add('task-status-bulk', {
-        taskIds: allowedTaskIds,
-        status: TaskStatus.COMPLETED,
-      });
-      return { updated: result.affected || 0, taskIds: allowedTaskIds };
-    });
-  }
-
-  async bulkDelete(taskIds: string[], currentUser: any): Promise<{ deleted: number; taskIds: string[] }> {
-    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-      throw new NotFoundException('No task IDs provided');
-    }
-    return await this.dataSource.transaction(async manager => {
-      let allowedTaskIds = taskIds;
-      if (currentUser.role !== 'ADMIN') {
-        const userTasks = await manager
-          .createQueryBuilder(Task, 'task')
-          .select('task.id')
-          .where('task.id IN (:...taskIds)', { taskIds })
-          .andWhere('task.userId = :userId', { userId: currentUser.id })
-          .getMany();
-        allowedTaskIds = userTasks.map(t => t.id);
-        if (allowedTaskIds.length === 0) {
-          throw new ForbiddenException('No authorized tasks to delete');
-        }
-      }
-      const result = await manager
-        .createQueryBuilder()
-        .delete()
-        .from(Task)
-        .where('id IN (:...ids)', { ids: allowedTaskIds })
-        .execute();
-      return { deleted: result.affected || 0, taskIds: allowedTaskIds };
-    });
+    const { raw, entities } = await qb.getRawAndEntities();
+    const total = raw.length > 0 ? parseInt(raw[0].totalCount, 10) : 0;
+    return {
+      data: entities,
+      total,
+      page,
+      limit,
+    };
   }
 }
