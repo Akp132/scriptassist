@@ -74,22 +74,26 @@ export class TasksController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update a task' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateTaskDto,
     @CurrentUser() currentUser: any,
   ) {
-    return this.tasksService.update(id, updateTaskDto, currentUser);
+    return this.commandBus.execute(
+      new (await import('./commands/update-task.command')).UpdateTaskCommand(id, updateTaskDto, currentUser)
+    );
   }
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete a task' })
-  remove(
+  async remove(
     @Param('id') id: string,
     @CurrentUser() currentUser: any,
   ) {
-    return this.tasksService.remove(id, currentUser);
+    return this.commandBus.execute(
+      new (await import('./commands/delete-task.command')).DeleteTaskCommand(id, currentUser)
+    );
   }
 
   @Post('batch')

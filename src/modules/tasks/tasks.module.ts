@@ -9,8 +9,15 @@ import { CreateTaskHandler } from './commands/create-task.handler';
 import { BulkCompleteTasksHandler } from './commands/bulk-complete-tasks.handler';
 import { GetTasksHandler } from './queries/get-tasks.handler';
 import { TaskCompletedHandler } from './events/task-completed.handler';
+import { UpdateTaskHandler } from './commands/update-task.handler';
+import { DeleteTaskHandler } from './commands/delete-task.handler';
 
-const CommandHandlers = [CreateTaskHandler, BulkCompleteTasksHandler];
+const CommandHandlers = [
+  CreateTaskHandler,
+  BulkCompleteTasksHandler,
+  UpdateTaskHandler,
+  DeleteTaskHandler,
+];
 const QueryHandlers = [GetTasksHandler];
 const EventHandlers = [TaskCompletedHandler];
 
