@@ -11,14 +11,17 @@ import { GetTasksHandler } from './queries/get-tasks.handler';
 import { TaskCompletedHandler } from './events/task-completed.handler';
 import { UpdateTaskHandler } from './commands/update-task.handler';
 import { DeleteTaskHandler } from './commands/delete-task.handler';
+import { GetTaskByIdHandler } from './queries/get-task-by-id.handler';
+import { MarkTaskIncompleteHandler } from './commands/mark-task-incomplete.handler';
 
 const CommandHandlers = [
   CreateTaskHandler,
   BulkCompleteTasksHandler,
   UpdateTaskHandler,
   DeleteTaskHandler,
+  MarkTaskIncompleteHandler,
 ];
-const QueryHandlers = [GetTasksHandler];
+const QueryHandlers = [GetTasksHandler, GetTaskByIdHandler];
 const EventHandlers = [TaskCompletedHandler];
 
 @Module({

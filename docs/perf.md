@@ -35,6 +35,10 @@ Index Scan using "IDX_task_user_status" on tasks  (cost=0.00..50.00 rows=10 widt
 | Bulk Complete (500)  | 250ms  | 28ms  | -89%        |
 | Paginated List Query | 120ms  | 9ms   | -92%        |
 
+## Get Task By ID
+- Single-row read, protected by role check
+- Same DB performance as before
+
 ## See also
 - `scripts/plan.sql` for query plans
 - `docs/architecture.md` for design rationale

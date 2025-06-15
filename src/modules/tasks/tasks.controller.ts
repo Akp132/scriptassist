@@ -63,12 +63,8 @@ export class TasksController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Find a task by ID' })
-  async findOne(@Param('id') id: string) {
-    const task = await this.tasksService.findOne(id);
-    if (!task) {
-      throw new HttpException(`Task with ID ${id} not found in the database`, HttpStatus.NOT_FOUND);
-    }
-    return instanceToPlain(task);
+  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.queryBus.execute(new (await import('./queries/get-task-by-id.query')).GetTaskByIdQuery(id, user));
   }
 
   @Patch(':id')
@@ -82,6 +78,12 @@ export class TasksController {
     return this.commandBus.execute(
       new (await import('./commands/update-task.command')).UpdateTaskCommand(id, updateTaskDto, currentUser)
     );
+  }
+
+  @Patch(':id/incomplete')
+  @ApiOperation({ summary: 'Mark a task as incomplete' })
+  async markIncomplete(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.commandBus.execute(new (await import('./commands/mark-task-incomplete.command')).MarkTaskIncompleteCommand(id, user));
   }
 
   @Delete(':id')

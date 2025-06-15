@@ -4,6 +4,10 @@
 - Separation of read (queries) and write (commands) logic for scalability and maintainability.
 - Enables independent optimization and scaling of read/write paths.
 
+### Read vs Write Responsibilities
+- Queries: list all tasks, get task by ID
+- Commands: create, update, delete, bulk complete, mark incomplete
+
 ## Security Design
 - Role-based access control (RBAC) for all sensitive operations.
 - JWT authentication with Redis-backed refresh token rotation for session security.
