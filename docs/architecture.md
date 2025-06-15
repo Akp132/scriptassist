@@ -5,12 +5,14 @@
 - Enables independent optimization and scaling of read/write paths.
 
 ### Read vs Write Responsibilities
-- Queries: list all tasks, get task by ID
-- Commands: create, update, delete, bulk complete, mark incomplete
+- Queries: list all tasks, get task by ID, admin list users
+- Commands: create, update, delete, bulk complete, mark incomplete, admin disable/delete user
 
 ## Security Design
 - Role-based access control (RBAC) for all sensitive operations.
 - JWT authentication with Redis-backed refresh token rotation for session security.
+- **Admin-only routes**: All /admin/users endpoints require admin role and RolesGuard.
+- **RolesGuard**: Checks request.user.role for required roles.
 
 ## Redis Usage
 - Used for BullMQ queues (background jobs) and caching.

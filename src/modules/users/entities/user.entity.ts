@@ -20,6 +20,9 @@ export class User {
   @Column({ default: 'user' })
   role: string;
 
+  @Column({ default: true })
+  isActive: boolean;
+
   @OneToMany(() => Task, (task) => task.user)
   tasks: Task[];
 
@@ -28,4 +31,4 @@ export class User {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-} 
+}
