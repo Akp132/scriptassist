@@ -90,7 +90,18 @@ export class TasksController {
     @Body() operations: { tasks: string[], action: 'complete' | 'delete' },
     @CurrentUser() currentUser: any,
   ) {
-    // Not implemented: bulkComplete and bulkDelete do not exist in TasksService
-    throw new HttpException('Batch processing not implemented', HttpStatus.NOT_IMPLEMENTED);
+    const { tasks, action } = operations;
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+      throw new HttpException('No task IDs provided', HttpStatus.BAD_REQUEST);
+    }
+    if (action === 'complete') {
+      const updated = await this.tasksService.bulkComplete(tasks, currentUser);
+      return { updated };
+    } else if (action === 'delete') {
+      const result = await this.tasksService.bulkDelete(tasks, currentUser);
+      return result;
+    } else {
+      throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Task } from './entities/task.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -142,5 +142,58 @@ export class TasksService {
       page,
       limit,
     };
+  }
+
+  async bulkComplete(taskIds: string[], currentUser: any): Promise<Task[]> {
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new NotFoundException('No task IDs provided');
+    }
+    return await this.dataSource.transaction(async (manager: EntityManager) => {
+      // Only allow owner or admin
+      let allowedTaskIds = taskIds;
+      if (currentUser.role !== 'admin') {
+        const userTasks = await manager
+          .createQueryBuilder(Task, 'task')
+          .select('task.id')
+          .where('task.id IN (:...taskIds)', { taskIds })
+          .andWhere('task.userId = :userId', { userId: currentUser.id })
+          .getMany();
+        allowedTaskIds = userTasks.map(t => t.id);
+        if (allowedTaskIds.length === 0) {
+          throw new ForbiddenException('No authorized tasks to complete');
+        }
+      }
+      const result = await manager
+        .createQueryBuilder()
+        .update(Task)
+        .set({ status: TaskStatus.COMPLETED })
+        .whereInIds(allowedTaskIds)
+        .returning('*')
+        .execute();
+      // Queue job
+      await this.taskQueue.add('bulk-status-update', {
+        taskIds: allowedTaskIds,
+        status: TaskStatus.COMPLETED,
+      });
+      return result.raw as Task[];
+    });
+  }
+
+  async bulkDelete(taskIds: string[], currentUser: any): Promise<{ deleted: number; taskIds: string[] }> {
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      throw new NotFoundException('No task IDs provided');
+    }
+    if (currentUser.role !== 'admin') {
+      throw new ForbiddenException('Only admin can bulk delete tasks');
+    }
+    return await this.dataSource.transaction(async (manager: EntityManager) => {
+      const result = await manager
+        .createQueryBuilder()
+        .delete()
+        .from(Task)
+        .whereInIds(taskIds)
+        .execute();
+      return { deleted: result.affected || 0, taskIds };
+    });
   }
 }

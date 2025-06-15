@@ -8,6 +8,7 @@ dotenv.config();
 import { CreateInitialSchema1710752400000 } from './migrations/1710752400000-CreateInitialSchema';
 import { AddRefreshTokenTable1718400000000 } from './migrations/1718400000000-AddRefreshTokenTable';
 import { AddTaskIndexes1718479200000 } from './migrations/1718479200000-AddTaskIndexes';
+import { AddTimelineIndex1718483000000 } from './migrations/1718483000000-AddTimelineIndex';
 
 console.log('Connecting to DB:', {
   host: process.env.DB_HOST,
@@ -29,6 +30,7 @@ export const dataSourceOptions: DataSourceOptions = {
     CreateInitialSchema1710752400000,
     AddRefreshTokenTable1718400000000,
     AddTaskIndexes1718479200000,
+    AddTimelineIndex1718483000000,
   ],
   migrationsTableName: 'migrations',
   synchronize: false, // Important: never true in production
