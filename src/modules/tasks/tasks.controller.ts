@@ -13,6 +13,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 
 @ApiTags('tasks')
 @Controller('tasks')
@@ -21,13 +22,18 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 @ApiBearerAuth()
 export class TasksController {
   constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
     private readonly tasksService: TasksService
   ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new task' })
-  create(@Body() createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+  async create(@Body() createTaskDto: CreateTaskDto) {
+    const task = await this.commandBus.execute(
+      new (await import('./commands/create-task.command')).CreateTaskCommand(createTaskDto)
+    );
+    return instanceToPlain(task);
   }
 
   @Get()
@@ -35,8 +41,11 @@ export class TasksController {
   @ApiQuery({ type: TaskQueryDto })
   async findAll(
     @Query(new ValidationPipe({ transform: true })) query: TaskQueryDto,
+    @CurrentUser() currentUser: any,
   ) {
-    const { data, total, page, limit } = await this.tasksService.findAllFiltered(query);
+    const { data, total, page, limit } = await this.queryBus.execute(
+      new (await import('./queries/get-tasks.query')).GetTasksQuery(query, currentUser)
+    );
     return {
       data: instanceToPlain(data),
       total,
@@ -95,9 +104,12 @@ export class TasksController {
       throw new HttpException('No task IDs provided', HttpStatus.BAD_REQUEST);
     }
     if (action === 'complete') {
-      const updated = await this.tasksService.bulkComplete(tasks, currentUser);
+      const updated = await this.commandBus.execute(
+        new (await import('./commands/bulk-complete-tasks.command')).BulkCompleteTasksCommand(tasks, currentUser)
+      );
       return { updated };
     } else if (action === 'delete') {
+      // Retain legacy service for delete (no CQRS event/command for delete yet)
       const result = await this.tasksService.bulkDelete(tasks, currentUser);
       return result;
     } else {
