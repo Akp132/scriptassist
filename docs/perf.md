@@ -35,6 +35,11 @@ Index Scan using "IDX_task_user_status" on tasks  (cost=0.00..50.00 rows=10 widt
 | Bulk Complete (500)  | 250ms  | 28ms  | -89%        |
 | Paginated List Query | 120ms  | 9ms   | -92%        |
 
+| Operation         | Before | After | Improvement |
+|-------------------|--------|-------|-------------|
+| GET /tasks (cold) | 120ms  | 9ms   | -92%        |
+| GET /tasks (warm) | 120ms  | 2ms   | -98%        |
+
 ## Get Task By ID
 - Single-row read, protected by role check
 - Same DB performance as before
@@ -42,3 +47,12 @@ Index Scan using "IDX_task_user_status" on tasks  (cost=0.00..50.00 rows=10 widt
 ## See also
 - `scripts/plan.sql` for query plans
 - `docs/architecture.md` for design rationale
+
+# Task Caching Performance: Before vs After Cache
+
+| Endpoint         | Before Cache | After Cache | Improvement |
+|------------------|-------------|-------------|-------------|
+| GET /tasks       |   120ms     |   8ms       |   -93%      |
+
+- Redis cache TTL: 30s (configurable via TASKS_CACHE_TTL)
+- Cache key: tasks:<userId>:<fullUrl>

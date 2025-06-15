@@ -11,11 +11,12 @@ import { TaskProcessorModule } from './queues/task-processor/task-processor.modu
 import { ScheduledTasksModule } from './queues/scheduled-tasks/scheduled-tasks.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import * as redisStore from 'cache-manager-ioredis';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { CacheService } from './common/services/cache.service';
 import redisConfig from './config/redis.config';
 import { LoggingModule } from './logging/logging.module';
 import { HealthModule } from './health/health.module';
+import { PerfLoggerInterceptor } from './common/interceptors/perf-logger.interceptor';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { HealthModule } from './health/health.module';
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: PerfLoggerInterceptor },
     CacheService,
   ],
   exports: [CacheService],

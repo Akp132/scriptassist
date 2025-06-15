@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Patch, Post, Query, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Patch, Post, Query, UseGuards, ValidationPipe, UseInterceptors } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -14,12 +14,14 @@ import { TaskQueryDto } from './dto/task-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CacheTasksInterceptor } from '../../common/interceptors/cache-tasks.interceptor';
 
 @ApiTags('tasks')
 @Controller('tasks')
 @UseGuards(JwtAuthGuard, RolesGuard, RateLimitGuard)
 @RateLimit({ limit: 100, windowMs: 60000 })
 @ApiBearerAuth()
+@UseInterceptors(CacheTasksInterceptor)
 export class TasksController {
   constructor(
     private readonly commandBus: CommandBus,
