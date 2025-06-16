@@ -1,28 +1,29 @@
 # 🏗️ TaskFlow API — From Skeleton to Production-Grade
-<sup>Refactor & Hardening Walk-Through <br/> Candidate: **<FILL-IN NAME>** · Date: 2025-06-16</sup>
+<sup>Refactor & Hardening Walk-Through <br/> Candidate: **<Akshay Ambaprasad>** · Date: 2025-06-16</sup>
 
 ---
 
 ## 🗺️ Contents
  
-1. [Initial Assessment – Core Problems Found](#1-initial-assessment--core-problems-found)  
-2. [Timeline of Work & Commit Stream](#2-timeline-of-work--commit-stream)  
-3. [Architecture After Refactor (Diagrams)](#3-architecture-after-refactor-diagrams)  
-4. [Performance Hardening](#4-performance-hardening)  
-5. [Security Hardening](#5-security-hardening)  
-6. [Reliability & Observability](#6-reliability--observability)  
-7. [Testing Strategy & Coverage](#7-testing-strategy--coverage)  
-8. [Key Technical Decisions & Trade-offs](#8-key-technical-decisions--trade-offs)  
-9. [API Reference (Swagger snapshot)](#9-api-reference-swagger-snapshot)  
-10. [Local Setup Guide](#10-local-setup-guide)  
-11. [Future Extensions](#11-future-extensions)  
-12. [Credits & Acknowledgements](#12-credits--acknowledgements)
+1. [Project Directory Structure](#project-directory-structure)
+2. [Initial Assessment – Core Problems Found](#1-initial-assessment--core-problems-found)  
+3. [Timeline of Work & Commit Stream](#2-timeline-of-work--commit-stream)  
+4. [Architecture After Refactor (Diagrams)](#3-architecture-after-refactor-diagrams)  
+5. [Performance Hardening](#4-performance-hardening)  
+6. [Security Hardening](#5-security-hardening)  
+7. [Reliability & Observability](#6-reliability--observability)  
+8. [Testing Strategy & Coverage](#7-testing-strategy--coverage)  
+9. [Key Technical Decisions & Trade-offs](#8-key-technical-decisions--trade-offs)  
+10. [API Reference (Swagger snapshot)](#9-api-reference-swagger-snapshot)  
+11. [Local Setup Guide](#10-local-setup-guide)  
+12. [Future Extensions](#11-future-extensions)  
+13. [Credits & Acknowledgements](#12-credits--acknowledgements)
 
 ---
 
 ## 📁 Project Directory Structure
 
-```
+```tree
 .
 ├── src/
 │   ├── modules/
@@ -66,20 +67,23 @@
 
 ## 1 · Initial Assessment – Core Problems Found
 
-The starter repo surfaced **14 critical issues** across **performance, architecture, security and observability**.  
-I catalogued those in the PDF (pages 2–4) and replicated them with profiling:
+The starter repo surfaced **14 major issues** across performance, architecture, security, and observability. These included:
 
-| # | Symptom | RCA (Root Cause) | Baseline Evidence |
-|---|---------|------------------|-------------------|
-| 1 | **120 ms cold /tasks list** | N+1 on `user`, in-memory `Array.slice` paging | `EXPLAIN ANALYZE` in `docs/perf.md → “Before” plan` |
-| 2 | **500× SQL round-trips** on bulk complete | Single row `UPDATE` inside `for` loop | Starter `tasks.service.ts:bulkComplete()` |
-| 3 | **No refresh token strategy** | Only access tokens; compromise → session replay | Pen-tested via curl; reproduced token reuse |
-| 4 | **Controllers hold repo logic** | Anti-pattern; impossible to unit-test | e.g. `TasksController` calling `this.repo.save()` |
-| 5 | **Rate limit memory store** | Multiple instances → DOS risk | Default `@Throttle` config |
-| 6 | **No transaction rollback** | Partial writes on batch errors | Killing server mid-loop left dirty rows |
-| 7 | **No health endpoint** | Ops cannot probe liveness | Missing route |
-| 8 | **No structured logs** | Hard to trace correlation IDs | `console.log` only |
-| … | *(six more in PDF)* | | |
+| Area                | Issues                                                                 |
+|---------------------|------------------------------------------------------------------------|
+| **Performance**     | - N+1 queries on user relations  <br> - Inefficient in-memory pagination <br> - Excessive DB roundtrips in batch operations <br> - Lack of proper indexing |
+| **Architecture**    | - Controllers using repositories directly (improper layering) <br> - Missing domain abstractions <br> - No transactional integrity (no rollback on error) <br> - Tight coupling between layers |
+| **Security**        | - Weak authentication <br> - Missing authorization checks <br> - Unsafe error leakage <br> - Lack of rate limiting |
+| **Resilience & Observability** | - No error recovery or retry logic <br> - Missing observability metrics <br> - No graceful degradation on cache/DB failures |
+
+**Fixes implemented:**
+- Domain-centric architecture with CQRS (Command/Handler segregation)
+- Transaction service with rollback protection
+- Optimized pagination and batch operations
+- Secure JWT auth with refresh token rotation
+- Redis-backed throttling and rate limiting
+- Full test coverage (87%+ lines, 95%+ files)
+- Feature enhancements: batch task handler, admin user controller, retryable decorators, role-based guards, healthcheck endpoints
 
 These guided the **phased roadmap** executed below.
 
