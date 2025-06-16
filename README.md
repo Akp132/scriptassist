@@ -73,7 +73,7 @@ The starter repo surfaced **14 major issues** across performance, architecture, 
 |---------------------|------------------------------------------------------------------------|
 | **Performance**     | - N+1 queries on user relations  <br> - Inefficient in-memory pagination <br> - Excessive DB roundtrips in batch operations <br> - Lack of proper indexing |
 | **Architecture**    | - Controllers using repositories directly (improper layering) <br> - Missing domain abstractions <br> - No transactional integrity (no rollback on error) <br> - Tight coupling between layers |
-| **Security**        | - Weak authentication <br> - Missing authorization checks <br> - Unsafe error leakage <br> - Lack of rate limiting |
+| **Security**        | - Weak authentication <br> - Missing authorization checks <br> - Unsafe error leakage <br> - Lack of rate limiting <br> - Password hashes were being leaked in task-related API responses when returning associated user entities. This critical vulnerability was resolved by decorating the password field with `@Exclude()` and serializing responses using `instanceToPlain()` to ensure only safe fields are exposed. |
 | **Resilience & Observability** | - No error recovery or retry logic <br> - Missing observability metrics <br> - No graceful degradation on cache/DB failures |
 
 **Fixes implemented:**
@@ -195,6 +195,9 @@ Result: cold 120 ms → 9 ms, warm 2 ms (–98 %).
 - Controller decorators enforce:
   - `PATCH /tasks/:id` → owner ∨ admin
   - `DELETE /tasks/:id` → admin only.
+- Hardened batch operations and admin endpoints with strict authorization checks:
+  - Task updates and deletions are now protected with identity-based authorization (ensuring only task owners can update).
+  - Admin-only endpoints such as user disable/delete are protected with a custom `@Roles('admin')` guard.
 
 ### 5.3 Rate Limiting
 - `@Throttle(5,60)` on `/auth/login`.
@@ -216,6 +219,7 @@ Result: cold 120 ms → 9 ms, warm 2 ms (–98 %).
 | Perf metrics | `PerfLoggerInterceptor` logs ms per request with label Perf. |
 | Health checks | `/health` uses Terminus ⇒ Postgres ping, Redis ping, build SHA. |
 | BullMQ | Background job for bulk status update; future email jobs hook via TaskCompletedEvent. |
+| Improved error handling to prevent internal server errors and stack traces from leaking to clients. All service and handler-level exceptions are now wrapped in `NotFoundException`, `ForbiddenException`, etc., to return meaningful HTTP responses. |
 
 ---
 
@@ -230,6 +234,14 @@ Result: cold 120 ms → 9 ms, warm 2 ms (–98 %).
 | admin.controller.spec.ts | Roles guard logic, QueryBus/CommandBus mocking |
 | retryable.decorator.spec.ts | Simulated flaky method, retry count & final fail |
 | transaction.service.spec.ts | Commit vs rollback expectation |
+
+Added tests for core infrastructure components previously untested, including:
+- `JwtAuthGuard` to validate authentication pipeline
+- `RolesGuard` and `@Roles` decorator to ensure RBAC works
+- `retryable.decorator.ts` to ensure automatic retries
+- `transaction.service.ts` to verify rollback/commit behavior under success and failure
+
+These additions bring previously untested but **critical framework-level logic** under complete test coverage.
 
 ### 7.2 Coverage Metrics
 
