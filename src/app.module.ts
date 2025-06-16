@@ -17,6 +17,7 @@ import redisConfig from './config/redis.config';
 import { LoggingModule } from './logging/logging.module';
 import { HealthModule } from './health/health.module';
 import { PerfLoggerInterceptor } from './common/interceptors/perf-logger.interceptor';
+import { TransactionService } from './common/services/transaction.service';
 
 @Module({
   imports: [
@@ -90,7 +91,8 @@ import { PerfLoggerInterceptor } from './common/interceptors/perf-logger.interce
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: PerfLoggerInterceptor },
     CacheService,
+    TransactionService,
   ],
-  exports: [CacheService],
+  exports: [CacheService, TransactionService],
 })
 export class AppModule {}

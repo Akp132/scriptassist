@@ -5,6 +5,8 @@ import { TaskPriority } from '../enums/task-priority.enum';
 @Index('IDX_task_user_status', ['userId', 'status'])
 @Index('IDX_task_due_date', ['dueDate'])
 @Index('IDX_task_created_updated', ['createdAt', 'updatedAt'])
+@Index('IDX_task_overdue', ['userId', 'dueDate'])
+@Index('IDX_task_user_due_date', ['userId', 'dueDate'])
 @Entity('tasks')
 export class Task {
   @PrimaryGeneratedColumn('uuid')

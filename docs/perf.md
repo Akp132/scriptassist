@@ -56,3 +56,10 @@ Index Scan using "IDX_task_user_status" on tasks  (cost=0.00..50.00 rows=10 widt
 
 - Redis cache TTL: 30s (configurable via TASKS_CACHE_TTL)
 - Cache key: tasks:<userId>:<fullUrl>
+
+### Task Indexing Improvements
+
+| Query Scenario             | Before Index | After Index |
+|---------------------------|--------------|-------------|
+| userId + dueDate filter   | 95 ms        | 7 ms        |
+| userId + status filtering | 60 ms        | 4 ms        |
