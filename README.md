@@ -127,10 +127,10 @@ flowchart LR
   end
   API --> CommandBus
   API --> QueryBus
-  CQRSHandlers --TypeORM--> Postgres>PostgreSQL]
-  CQRSHandlers --BullMQ--> RedisCache[Redis]
+  CQRSHandlers -- TypeORM --> Postgres[PostgreSQL]
+  CQRSHandlers -- BullMQ --> RedisCache[Redis]
   API -.-> RedisCache
-  Prometheus---o>MetricsExporter
+  Prometheus --- MetricsExporter
   HealthEndpoint --> Postgres
   HealthEndpoint --> RedisCache
 ```
