@@ -15,6 +15,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CacheTasksInterceptor } from '../../common/interceptors/cache-tasks.interceptor';
+import { BatchTaskDto } from './dto/batch-task.dto';
+import { BatchUpdateTasksCommand } from './commands/batch-update-tasks.command';
 
 @ApiTags('tasks')
 @Controller('tasks')
@@ -101,27 +103,8 @@ export class TasksController {
   }
 
   @Post('batch')
-  @ApiOperation({ summary: 'Batch process multiple tasks' })
-  @ApiBody({ schema: { properties: { tasks: { type: 'array', items: { type: 'string' } }, action: { type: 'string', enum: ['complete', 'delete'] } } } })
-  async batchProcess(
-    @Body() operations: { tasks: string[], action: 'complete' | 'delete' },
-    @CurrentUser() currentUser: any,
-  ) {
-    const { tasks, action } = operations;
-    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-      throw new HttpException('No task IDs provided', HttpStatus.BAD_REQUEST);
-    }
-    if (action === 'complete') {
-      const updated = await this.commandBus.execute(
-        new (await import('./commands/bulk-complete-tasks.command')).BulkCompleteTasksCommand(tasks, currentUser)
-      );
-      return { updated };
-    } else if (action === 'delete') {
-      // Retain legacy service for delete (no CQRS event/command for delete yet)
-      const result = await this.tasksService.bulkDelete(tasks, currentUser);
-      return result;
-    } else {
-      throw new HttpException(`Unknown action: ${action}`, HttpStatus.BAD_REQUEST);
-    }
+  @UseGuards(JwtAuthGuard)
+  async batch(@Body() dto: BatchTaskDto, @CurrentUser() user: any) {
+    return this.commandBus.execute(new BatchUpdateTasksCommand(dto.taskIds, dto.action, user));
   }
 }

@@ -28,13 +28,22 @@ export class CacheTasksInterceptor implements NestInterceptor {
     }
     const userId = req.user?.id || 'anon';
     const cacheKey = `tasks:${userId}:${req.originalUrl}`;
-    const cached = await this.cacheManager.get(cacheKey);
+    let cached: any;
+    try {
+      cached = await this.cacheManager.get(cacheKey);
+    } catch (err: any) {
+      console.warn('[CacheTasksInterceptor] Redis get failed:', err?.message || err);
+    }
     if (cached) {
       return of(cached);
     }
     return next.handle().pipe(
       tap(async (result) => {
-        await this.cacheManager.set(cacheKey, result, this.ttl);
+        try {
+          await this.cacheManager.set(cacheKey, result, this.ttl);
+        } catch (err: any) {
+          console.warn('[CacheTasksInterceptor] Redis set failed:', err?.message || err);
+        }
       }),
     );
   }

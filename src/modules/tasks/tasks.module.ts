@@ -13,6 +13,7 @@ import { UpdateTaskHandler } from './commands/update-task.handler';
 import { DeleteTaskHandler } from './commands/delete-task.handler';
 import { GetTaskByIdHandler } from './queries/get-task-by-id.handler';
 import { MarkTaskIncompleteHandler } from './commands/mark-task-incomplete.handler';
+import { BatchUpdateTasksHandler } from './commands/batch-update-tasks.handler';
 
 const CommandHandlers = [
   CreateTaskHandler,
@@ -20,6 +21,7 @@ const CommandHandlers = [
   UpdateTaskHandler,
   DeleteTaskHandler,
   MarkTaskIncompleteHandler,
+  BatchUpdateTasksHandler,
 ];
 const QueryHandlers = [GetTasksHandler, GetTaskByIdHandler];
 const EventHandlers = [TaskCompletedHandler];
